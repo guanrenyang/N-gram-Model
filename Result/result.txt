@@ -1,0 +1,2 @@
+Add-one smoothing:
+Perplexity in testing data is: 1544.6569517981004
