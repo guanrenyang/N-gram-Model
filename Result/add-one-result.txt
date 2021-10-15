@@ -1,0 +1,1 @@
+Perplexity in testing data is: 2896.661947041087 
