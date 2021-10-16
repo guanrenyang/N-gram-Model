@@ -10,7 +10,6 @@ import numpy as np
 train_data_path = './Dataset/train_set.txt'
 test_data_path = './Dataset/test_set.txt'
 dev_data_path = './Dataset/dev_set.txt'
-toy_data_path = './Dataset/toy_set.txt'
 
 # The path of result file
 result_file_path = ''
@@ -55,14 +54,14 @@ def load_data(file_path: str):
     file.close()
     return tokens
 
-def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
+def train(tokens, smoothing_method = 'addictive', vocab_threshold=0):
     '''
     Train the n-gram model and store the model in an `arpa` file
     
     Args:
         tokens: list. A list of tokens.
         arpa_file_path: str. `train` function will store the `arpa` format in `arpa_file_path`. The path must end with `.arpa`
-        smoothing_method: str. Specify the smoothing method. It could be `add_one` or `absolute_discounting` or
+        smoothing_method: str. Specify the smoothing method. It could be `addictive` or `absolute_discounting` or
                                                                          `good_turing` or `linear_discounting` or `katz_back_off`
         vocab_threshold: int. Filter out words with frequency < `vocab_threshold` (extrict less than)
     Return:
@@ -99,7 +98,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
             for prev_word, word_dict in bi_gram_count.items():
                 bi_k=bi_k+len(word_dict)
                 bi_N=bi_N+sum(word_dict.values())
-                #统计n_1,n_2
+                #compute n_1,n_2
                 for key in bi_gram_count[prev_word]:
                     if bi_gram_count[prev_word][key] == 1:
                         bi_n1=bi_n1+1
@@ -107,7 +106,8 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                         bi_n2=bi_n2+1
             bi_n0 = V**2-bi_k 
             bi_b = {}           
-                #以b的上界作为b的取值
+
+            # Take the upper bound of b as the value of b
             if bi_n1 != 0 and bi_n2 != 0:
                 bi_b=bi_n1/((bi_n1+2*bi_n2))
             for prev_word, word_dict in bi_gram_count.items():
@@ -115,17 +115,17 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 conditional_total_bigram_with_repeat = sum(word_dict.values())             
                 bi_gram_probability[prev_word] = {}            
                 max_2 = max(word_dict.values())
-                p_2 = np.zeros(max_2+1) #n_2[r]表示以prev_word开头，出现r次的二元组的个数
-                p_2Absolute = np.zeros(max_2+1) #归一化后的概率值
+                p_2 = np.zeros(max_2+1) # n_2[r] denotes the number of binary groups that start with prev_word and occur r times
+                p_2Absolute = np.zeros(max_2+1) # Normalized probability values
 
                 if bi_n0 != 0:
-                    #计算r>0时的p(r)
+                    # Calculate p(r) for r > 0
                     for r in range(1,max_2+1):
                         p_2[r]=(r-bi_b)/bi_N
                     p_2[0]=bi_b*(bi_R-bi_n0)/(bi_N*bi_n0)
-                    #p(r)计算结束
+                    
 
-                    #归一化
+                    # Normalization
                     sum_2=0
                     for i in range(0,max_2+1):
                         sum_2+=p_2[i]
@@ -135,7 +135,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 else:
                     for i in range(0,max_2+1):
                         p_2Absolute[i] = i/conditional_total_bigram_with_repeat
-                #更新概率字典中的概率值
+                # Update the probability values in the probability dictionary
                 for key, value in word_dict.items():
                     if p_2Absolute[bi_gram_count[prev_word][key]]!=0:
                         bi_gram_probability[prev_word][key] = p_2Absolute[bi_gram_count[prev_word][key]]
@@ -157,7 +157,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
             for prev_word, word_dict in tri_gram_count.items():
                 tri_k=tri_k+len(word_dict)
                 tri_N=tri_N+sum(word_dict.values())
-                #统计n_1,n_2
+                # Statistics n_1,n_2
                 for key in tri_gram_count[prev_word]:
                     if tri_gram_count[prev_word][key] == 1:
                         tri_n1=tri_n1+1
@@ -166,7 +166,8 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                         tri_n2=tri_n2+1
             tri_n0 = V**3-tri_k
             tri_b = {}
-                #以b的上界作为b的取值
+
+            # Take the upper bound of b as the value of b
             if tri_n1 != 0 and tri_n2 != 0:
                 tri_b=tri_n1/(tri_n1+2*tri_n2)
             for prev_word, word_dict in tri_gram_count.items():
@@ -174,20 +175,19 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 #conditional_total_trigram = len(word_dict)
                     
                 tri_gram_probability[prev_word] = {}
-                
 
                 max_3 = max(word_dict.values())
-                p_3 = np.zeros(max_3+1) #n_3[r]表示以prev_word开头，出现r次的三元组的个数
-                p_3Absolute = np.zeros(max_3+1) #归一化后的概率值
+                p_3 = np.zeros(max_3+1) # n_3[r] indicates the number of triples starting with prev_word and occurring r times
+                p_3Absolute = np.zeros(max_3+1) # Normalized probability values
 
                 if tri_n0 != 0:
-                    #计算r>0时的p(r)
+                    # Calculate p(r) for r > 0
                     for r in range(1,max_3+1):
                         p_3[r]=(r-tri_b)/tri_N
                     p_3[0]=tri_b*(tri_R-tri_n0)/(tri_N*tri_n0)
-                    #p(r)计算结束
+                    # End of p(r) calculation
 
-                    #归一化
+                    # Normalization
                     sum_3=0
                     for i in range(0,max_3+1):
                         sum_3+=p_3[i]
@@ -196,7 +196,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 else:
                     for i in range(0,max_3+1):
                         p_3Absolute[i] = i/conditional_total_trigram_with_repeat
-                #更新概率字典中的概率值
+                # Update the probability values in the probability dictionary
                 for key, value in word_dict.items():
                     if p_3Absolute[tri_gram_count[prev_word][key]]!=0:
                         tri_gram_probability[prev_word][key] = p_3Absolute[tri_gram_count[prev_word][key]]
@@ -212,7 +212,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
         dumpf(model, arpa_file_path)
         print('\n=====finish saving=====')
         return 
-    def add_one_smoothing():
+    def addictive_smoothing():
         '''
         Calculate probabilities of 1, 2, and 3 grams accroding to `uni_gram_count`, `bi_gram_count`, and `tri_gram_count`
         This is a inner function of function `train()`, so it has no passing arguments.
@@ -222,7 +222,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
         vocab_size = len(uni_gram_count.keys())
 
         # calculate 1-gram probability
-        print('\n=====calculate 1-gram probability(add one smooth)=====')
+        print('\n=====calculate 1-gram probability(addictive smooth)=====')
         total_unigram_with_repeat = sum(uni_gram_count.values())
         
         with tqdm(total=len(uni_gram_count)) as pbar:
@@ -233,7 +233,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
         mean_uni_prob = np.mean(list(uni_gram_probability.values()))
 
         # calculate 2-gram probability
-        print('\n=====calculate 2-gram probability(add one smooth)=====')
+        print('\n=====calculate 2-gram probability(addictive smooth)=====')
         uni_bo = {}
         # calculate 2-gram probability for r>0
         with tqdm(total=len(bi_gram_count)) as pbar:
@@ -251,7 +251,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
 
 
         # calculate 3-gram probability
-        print('\n=====calculate 3-gram probability(add one smooth)=====')
+        print('\n=====calculate 3-gram probability(addictive smooth)=====')
         bi_bo = {}
         with tqdm(total=len(tri_gram_count)) as pbar:
             for prev_word, word_dict in tri_gram_count.items():
@@ -283,39 +283,35 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
         total_unigram_with_repeat = sum(uni_gram_count.values()) 
         
         with tqdm(total=len(uni_gram_count)) as pbar:
-            #计算r*的部分从这里开始
+            # The part of calculating r* starts here
 
-            #这里做了改动，统计的最大次数为limit
-            max_1 = uni_limit
-            n_1 = np.zeros(max_1+1) #n_1[r]表示出现r次的一元组的个数
-            r_1star = np.zeros(max_1+1) #r_1star[r]表示r调整后的r*
-            p_1 = np.zeros(max_1+1) #存放计算r*后的概率值
-            p_1Good_turing = np.zeros(max_1+1) #归一化后的概率值
+            # The maximum number of statistics is limit
+            max_1 = uni_limit 
+            n_1 = np.zeros(max_1+1) # n_1[r] denotes the number of monomials that occur r times
+            r_1star = np.zeros(max_1+1) # r_1star[r] denotes the r adjusted r*
+            p_1 = np.zeros(max_1+1) # Store the probability value after calculating r*
+            p_1Good_turing = np.zeros(max_1+1) # Normalized probability values
 
             for key in uni_gram_count:
-                if uni_gram_count[key] <= max_1: #这里增加了判断
-                    n_1[uni_gram_count[key]]=n_1[uni_gram_count[key]]+1 #统计出现r次元组的个数
+                if uni_gram_count[key] <= max_1: # Here the judgment is added
+                    n_1[uni_gram_count[key]]=n_1[uni_gram_count[key]]+1 # Count the number of occurrences of r-tuples
             for r in range(1,max_1):
-                if n_1[r] != 0 and n_1[r+1] != 0: #这里增加了对r取值不连续的处理，只有当出现r次的个数和出现r+1次的个数均不为0时才能套用公式，否则r*按r算，即都按处理r_max的方式来处理
-                    r_1star[r]=(r+1)*n_1[r+1]/n_1[r] #套公式
+                if n_1[r] != 0 and n_1[r+1] != 0: 
+                    r_1star[r]=(r+1)*n_1[r+1]/n_1[r] 
                 else:
                     r_1star[r]=r
-            r_1star[max_1]=max_1 #r*[max]和p[0]单独处理
-            #计算r*的部分在这里结束
-
+            r_1star[max_1]=max_1 # r*[max] and p[0] are handled separately
 
             p_1[0] = n_1[1]/total_unigram_with_repeat
             for r in range(1,max_1+1):
-                p_1[r]=r_1star[r]/total_unigram_with_repeat #计算r*之后的概率
-            #归一化
+                p_1[r]=r_1star[r]/total_unigram_with_repeat # Calculate the probability after r*
+            # Normalization
             sum_1=0
             for i in range(0,max_1+1):
                 sum_1+=p_1[i]
             for i in range(0,max_1+1):
                 p_1Good_turing[i] = p_1[i]/sum_1
             for key in uni_gram_count:
-
-                #这里增加了条件语句，对次数小于limit和大于limit的词分别计算概率
                 if uni_gram_count[key] <= max_1:
                     uni_gram_probability[key] = p_1Good_turing[uni_gram_count[key]]
                 else:
@@ -323,7 +319,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 model.add_entry((key,), log10(uni_gram_probability[key]), bo=0) # the probability value in `arpa` file is log_10(probability)
                 
                 pbar.update(1)
-            #在概率字典中加入<unk>，count字典不变
+
             uni_gram_probability[UNKNOWN] = p_1Good_turing[0]
             model.add_entry((UNKNOWN,), uni_gram_probability[UNKNOWN], bo=0)
             
@@ -335,7 +331,6 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 conditional_total_bigram_with_repeat = sum(word_dict.values())
                 bi_gram_probability[prev_word] = {}
 
-
             #计算r*从这里开始
 
             #这里改变了max_2的值
@@ -346,7 +341,6 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 p_2Good_turing = np.zeros(max_2+1) #归一化后的概率值
                 for key, value in word_dict.items():
 
-
                     #这里增加判断
                     if word_dict[key] <= max_2:
                         n_2[word_dict[key]]=n_2[word_dict[key]]+1 #统计出现r次元组的个数
@@ -355,20 +349,18 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                         r_2star[r]=(r+1)*n_2[r+1]/n_2[r] #套公式
                     else:
                         r_2star[r] = r
-                r_2star[max_2]=max_2 #r*[max]和p[0]单独处理
-            #计算r*的部分在这里结束
+                r_2star[max_2]=max_2 # r*[max] and p[0] are handled separately
+
                 p_2[0] = (n_2[1]) if n_2[1]!=0 else 1 /conditional_total_bigram_with_repeat
                 for r in range(1,max_2+1):
-                    p_2[r]=r_2star[r]/conditional_total_bigram_with_repeat #计算r*之后的概率
-                #归一化
+                    p_2[r]=r_2star[r]/conditional_total_bigram_with_repeat 
+                # Normalization
                 sum_2=0
                 for i in range(0,max_2+1):
                     sum_2+=p_2[i]
                 for i in range(0,max_2+1):
                     p_2Good_turing[i] = p_2[i]/sum_2
 
-
-                #这里增加了判断
                 for key, value in word_dict.items():
                     if word_dict[key] <= max_2:
                         bi_gram_probability[prev_word][key] = p_2Good_turing[bi_gram_count[prev_word][key]]
@@ -406,7 +398,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
             for prev_word, word_dict in bi_gram_count.items():
                 bi_k=bi_k+len(word_dict)
                 bi_N=bi_N+sum(word_dict.values())
-                #统计n_1,n_2
+                # count n_1,n_2
                 for key in bi_gram_count[prev_word]:
                     if bi_gram_count[prev_word][key] == 1:
                         bi_n1=bi_n1+1
@@ -419,17 +411,16 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 conditional_total_bigram_with_repeat = sum(word_dict.values())             
                 bi_gram_probability[prev_word] = {}            
                 max_2 = max(word_dict.values())
-                p_2 = np.zeros(max_2+1) #n_2[r]表示以prev_word开头，出现r次的二元组的个数
-                p_2Linear = np.zeros(max_2+1) #归一化后的概率值
+                p_2 = np.zeros(max_2+1) # n_2[r] denotes the number of binary groups that start with prev_word and occur r times
+                p_2Linear = np.zeros(max_2+1) # Normalized probability values
 
                 if bi_n0 != 0:
-                    #计算r>0时的p(r)
+                    # Calculate p(r) for r > 0
                     for r in range(1,max_2+1):
                         p_2[r]=r*(1-bi_alpha)/bi_N
                     p_2[0]=bi_alpha/bi_n0
-                    #p(r)计算结束
 
-                    #归一化
+                    # Normalization
                     sum_2=0
                     for i in range(0,max_2+1):
                         sum_2+=p_2[i]
@@ -439,7 +430,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 else:
                     for i in range(0,max_2+1):
                         p_2Linear[i] = i/conditional_total_bigram_with_repeat
-                #更新概率字典中的概率值
+                # Update the probability values in the probability dictionary
                 for key, value in word_dict.items():
                     if p_2Linear[bi_gram_count[prev_word][key]]!=0:
                         bi_gram_probability[prev_word][key] = p_2Linear[bi_gram_count[prev_word][key]]
@@ -460,7 +451,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
             for prev_word, word_dict in tri_gram_count.items():
                 tri_k=tri_k+len(word_dict)
                 tri_N=tri_N+sum(word_dict.values())
-                #统计n_1,n_2
+                # count n_1,n_2
                 for key in tri_gram_count[prev_word]:
                     if tri_gram_count[prev_word][key] == 1:
                         tri_n1=tri_n1+1
@@ -473,19 +464,17 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                     
                 tri_gram_probability[prev_word] = {}
                 
-
                 max_3 = max(word_dict.values())
-                p_3 = np.zeros(max_3+1) #n_3[r]表示以prev_word开头，出现r次的三元组的个数
-                p_3Linear = np.zeros(max_3+1) #归一化后的概率值
+                p_3 = np.zeros(max_3+1) 
+                p_3Linear = np.zeros(max_3+1) # Normalized probability values
 
                 if tri_n0 != 0:
-                    #计算r>0时的p(r)
-                    for r in range(1,max_3+1):
+                    # Calculate p(r) for r > 0
+                    for r in range(1,max_3+1): 
                         p_3[r]=r*(1-tri_alpha)/tri_N
                     p_3[0]=tri_alpha/tri_n0
-                    #p(r)计算结束
 
-                    #归一化
+                    # Normalization
                     sum_3=0
                     for i in range(0,max_3+1):
                         sum_3+=p_3[i]
@@ -494,7 +483,7 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
                 else:
                     for i in range(0,max_3+1):
                         p_3Linear[i] = i/conditional_total_trigram_with_repeat
-                #更新概率字典中的概率值
+                # Update the probability values in the probability dictionary
                 for key, value in word_dict.items():
                     if p_3Linear[tri_gram_count[prev_word][key]]!=0:
                         tri_gram_probability[prev_word][key] = p_3Linear[tri_gram_count[prev_word][key]]
@@ -517,17 +506,16 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
         total_unigram_with_repeat = sum(uni_gram_count.values())
         max_uni = max(uni_gram_count.values())
         n_uni = [0 for i in range(max_uni+1)] # N[r] mean the num of grams appearing r times
-        # 这里不使用count在循环中，有效减小了复杂度
         list_uni_count_values = list(uni_gram_count.values())
         for i in list_uni_count_values:
             n_uni[i] += 1
-        # compute N_r finish
+
 
         # compute d_r
         d_uni = [0 for _ in range(max_uni+1)]
         for r in range(1, max_uni):
             d_uni[r] = ((r+1)*n_uni[r+1]/(r*n_uni[r]))  if n_uni[r]!=0 and n_uni[r+1]!=0  else 1
-        d_uni[-1] = 1 # 最大值特别处理，因为没有n_r+1
+        d_uni[-1] = 1 # The maximum value is handled specially because there is no n_r+1
 
         #compute 1-gram probability for r>0
         for key, r in uni_gram_count.items():
@@ -564,14 +552,14 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
 
             
         # compute alpha(back-off weight) for tokens
-        sum_p_ML = {} # 出现过的二元组的第二元的1gram概率之和
-        sum_p_katz = {} # 出现过的二元组的katz概率之和
-        alpha_uni ={} # 一元组的alpha值
+        sum_p_ML = {} # The sum of the 1-gram probabilities of the second element of the binary group that has occurred
+        sum_p_katz = {} # The sum of the katz probabilities of the occurrence of the binary group
+        alpha_uni ={} # alpha value of a tuple
         print('=====compute 1-gram backoff(alpha)=====')
         for word in uni_gram_count.keys():
             sum_p_ML[word] = 0
             sum_p_katz[word] = 0
-        # 修改:这里只需要遍历bi_gram_count就行
+
         with tqdm(total=len(uni_gram_count)**2) as pbar:
             for prev_word, word_dict in bi_gram_count.items():
                 for current_word in word_dict.keys():
@@ -582,17 +570,6 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
         for word in tqdm(uni_gram_count.keys()):
             alpha_uni[word] = (1-sum_p_katz.get(word, 0))/(1 - sum_p_ML.get(word, 0)) if sum_p_ML.get(word, 0)<1 else delta
         
-        # # 修改：下面这个循环去掉，只要alpha算出来就行了对每一个都把backoff计算出来代价太高
-        # print('=====compute probability for r=0=====')
-        # with tqdm(total=len(uni_gram_count)**2) as pbar:
-        #     for prev_word in uni_gram_count.keys():
-        #         for current_word in uni_gram_count.keys():
-        #             if not (prev_word in bi_gram_count.keys() and current_word in bi_gram_count[prev_word].keys()):
-        #                 if prev_word not in bi_gram_probability.keys():
-        #                     bi_gram_probability[prev_word] = {}
-        #                 bi_gram_probability[prev_word][current_word] = alpha_uni[prev_word] * uni_gram_probability[current_word]
-        #             pbar.update(1)
-
         print('\n=====calculate 3-gram probability(katz smooth)=====')
         
         # compute p_katz for r>0
@@ -621,17 +598,15 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
 
             
         print("compute alpha(back-off weight) for 3-gram not exist and 2-gram exist")
-        sum_p_ML = {} # 出现过的三元组的第三元的2-gram概率之和
-        sum_p_katz = {} # 出现过的三元组的katz概率之和
-        alpha_bi ={} # 二元组的alpha值
+        sum_p_ML = {} # The sum of the 2-gram probabilities of the third element of the triplet that has appeared
+        sum_p_katz = {} # The sum of the katz probabilities of the occurring triples
+        alpha_bi ={} # The alpha value of the binary
         
-        # 修改：这个也不需要，我们需要统计的只有c>0的，这不在其中
         for prev_word, word_dict in bi_gram_count.items():
             for word in word_dict.keys():
                 sum_p_ML[(prev_word, word)] = 0
                 sum_p_katz[(prev_word, word)] = 0
 
-        # 修改：这里只需要对tri_gram_count遍历就行了，其余的continue掉了，都是浪费时间
         for leading_2gram, word_dict in tqdm(tri_gram_count.items()):
                 for current_word in word_dict.keys():
                         sum_p_katz[leading_2gram] += tri_gram_probability[leading_2gram][current_word] 
@@ -641,20 +616,6 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
             for word, value in word_dict.items():
                 leading_2gram = (prev_word, word)
                 alpha_bi[leading_2gram] = (1-sum_p_katz.get(leading_2gram, 0))/(1 - sum_p_ML.get(leading_2gram, 0)) if sum_p_ML.get(leading_2gram, 0)!=1 else delta
-
-        # # 修改：这个循环不需要，只需要backoff即可
-        # for prev_prev_word in uni_gram_count.keys():
-        #     for prev_word in uni_gram_count.keys():
-        #         leading_2gram = (prev_prev_word, prev_word)
-        #         if leading_2gram not in tri_gram_probability.keys():
-        #             tri_gram_probability[leading_2gram] = {}
-        #         # compute probability for 3gram not exist and 2gram exist
-        #         if  prev_prev_word in bi_gram_count.keys() and prev_word in bi_gram_count[prev_prev_word].keys():
-        #             for current_word in uni_gram_count.keys():
-        #                 if not (leading_2gram in tri_gram_count.keys() and current_word in tri_gram_count[leading_2gram].keys()):
-        #                     tri_gram_probability[leading_2gram][current_word] = alpha_bi[leading_2gram] * bi_gram_probability[prev_word][current_word] 
-        #         else: # compute probability for 3gram not exist and 2gram not exist
-        #             tri_gram_probability[leading_2gram][current_word] = bi_gram_probability[prev_word][current_word]
                     
         # add probabilty in model:
         for key, value in uni_gram_probability.items():
@@ -665,7 +626,11 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
         for prev_word, word_dict in tri_gram_probability.items():
             for key, value in word_dict.items():
                 model.add_entry(prev_word+(key,), log10(value))
-        
+                
+        print('\n=====saving .arpa file in '+arpa_file_path+'=====')
+        dumpf(model, arpa_file_path)
+        print('\n=====finish saving=====')
+        return 
     # Store the number of 1-grams, 2-grams, and 3-grams in the training set.
     # They are properly set after counting
 
@@ -684,19 +649,23 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
             pbar.update(1)
     
     print('\n=====filter out low-frequency words=====')
+    filtered = []
+    uni_gram_count [UNKNOWN] = 0
     for key, value in uni_gram_count.items():
         if value < vocab_threshold:
-            uni_gram_count[UNKNOWN] = uni_gram_count.get(UNKNOWN, 0) + value
-            uni_gram_count.pop(key)
-    if UNKNOWN not in uni_gram_count.keys():
-        uni_gram_count[UNKNOWN] = 1 # 以防没有满足阈值的unigram，但也要由unk
+            uni_gram_count[UNKNOWN] += + value
+            filtered.append(key)
+    if uni_gram_count[UNKNOWN]==0: # In case of 
+        uni_gram_count[UNKNOWN] = 1 
+    for key in filtered:
+        uni_gram_count.pop(key)
     total_unigram = len(uni_gram_count)
 
     print('=====counting 2,3-grams=====')
 
     with tqdm(total=len(tokens)) as pbar:
         for current_token_index, current_token in enumerate(tokens):
-            if current_token not in uni_gram_count.keys(): # 不在vocabulary中，用unk替换
+            if current_token not in uni_gram_count.keys(): # replace tokens that are not in the vocabulary with UNKNOWN
                 current_token = UNKNOWN
 
             if current_token_index==0 :
@@ -750,8 +719,8 @@ def train(tokens, smoothing_method = 'add_one', vocab_threshold=0):
     model.add_count(2, total_bigram) # add the total number of 2-gram
     model.add_count(3, total_trigram) # add the total number of 3-gram
 
-    if smoothing_method=='add_one':
-        add_one_smoothing()
+    if smoothing_method=='addictive':
+        addictive_smoothing()
     elif smoothing_method=='absolute_discounting':
         absolute_discounting_smoothing()
     elif smoothing_method=='good_turing':
@@ -793,18 +762,18 @@ def test(tokens, result_file):
     print(f'Perplexity in testing data is: {ppl}')
     result_file.write(f'Perplexity in testing data is: {ppl} \n')
 
-# smoothing_method: str. Specify the smoothing method. It could be `add_one` or `absolute_discounting` or
+# smoothing_method: str. Specify the smoothing method. It could be `addictive` or `absolute_discounting` or
 #                                                                          `good_turing` or `linear_discounting` or `katz_back_off`
 
 if __name__ == '__main__':
     
-    add_one_arpa_file_path = './Model/tri-gram-add-one.arpa'
+    addictive_arpa_file_path = './Model/tri-gram-addictive.arpa'
     absolute_discounting_arpa_file_path = './Model/tri-gram-absolute-discounting.arpa'
     good_turing_arpa_file_path = './Model/tri-gram-good-turing.arpa'
     linear_discounting_arpa_file_path = './Model/tri-gram-linear-discounting.arpa'
     katz_back_off_arpa_file_path = './Model/tri-gram-katz.arpa'
 
-    add_one_result_file_path = './Result/add-one-result.txt'
+    addictive_result_file_path = './Result/addictive-result.txt'
     absolute_discounting_result_file_path = './Result/absolute-dicounting-result.txt'
     good_turing_result_file_path = './Result/good-turing-result.txt'
     linear_discounting_result_file_path = './Result/linear-discounting-result.txt'
@@ -816,9 +785,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # init `arpa_file_path`
-    if args.Smoothing == 'add_one':
-        arpa_file_path += add_one_arpa_file_path
-        result_file_path += add_one_result_file_path
+    if args.Smoothing == 'addictive':
+        arpa_file_path += addictive_arpa_file_path
+        result_file_path += addictive_result_file_path
     elif args.Smoothing == 'absolute_discounting':
         arpa_file_path += absolute_discounting_arpa_file_path
         result_file_path += absolute_discounting_result_file_path
@@ -843,10 +812,9 @@ if __name__ == '__main__':
     print('\n==========loading dev data==========')
     dev_tokens = load_data(dev_data_path)
 
-    print('\n==========training==========')
-    train(train_tokens, smoothing_method=args.Smoothing, vocab_threshold=0)
+    print('\n==========training, vocab_threshold--1==========')
+    train(train_tokens, smoothing_method=args.Smoothing, vocab_threshold=1)
 
     print('\n==========testing==========')
     result_file = open(result_file_path, 'a')
-    
-    test(test_tokens, result_file)
+    test(dev_tokens, result_file)
